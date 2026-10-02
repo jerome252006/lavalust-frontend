@@ -249,7 +249,7 @@ function Products({ onLogout }) {
       </header>
       <main id="catalog">
         {route === '#/products/new' || editingProduct
-          ? <section className="container standalone-section"><div className="page-heading"><p className="eyebrow">{editingProduct ? 'EDIT PRODUCT' : 'ADD PRODUCT'}</p><h1>{editingProduct ? 'Update product details.' : 'Add a new product.'}</h1><p className="lead">Keep your inventory information accurate and ready for your customers.</p></div><ProductForm product={editing || form} editing={Boolean(editingProduct)} error={error} onChange={change} onSubmit={save} onCancel={() => { setForm(emptyProduct); setError(''); go('#/products') }} /></section>
+          ? <section className="container standalone-section"><div className="page-heading"><p className="eyebrow">{editingProduct ? 'EDIT PRODUCT' : 'ADD PRODUCT'}</p><h1>{editingProduct ? 'Update product details.' : 'Add a new product.'}</h1><p className="lead">Keep your inventory information accurate and ready for your customers.</p></div><ProductForm product={form} editing={Boolean(editingProduct)} error={error} onChange={change} onSubmit={save} onCancel={() => { setForm(emptyProduct); setError(''); go('#/products') }} /></section>
           : <ProductList products={products} onEdit={edit} onDelete={remove} onAdd={() => { setForm(emptyProduct); setError(''); go('#/products/new') }} error={error} />}
       </main>
       <footer className="site-footer"><div className="container"><Brand /><p>Product management workspace.</p></div></footer>
