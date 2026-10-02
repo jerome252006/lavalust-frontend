@@ -22,10 +22,16 @@ function Brand() {
 function Login({ onLogin, error }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault()
-    onLogin(username, password)
+    setSubmitting(true)
+    try {
+      await onLogin(username, password)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -47,7 +53,7 @@ function Login({ onLogin, error }) {
             <label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required /></label>
             <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
             {error && <p className="alert error">{error}</p>}
-            <button className="button button-primary glass-button" type="submit">Sign in <span aria-hidden="true">↗</span></button>
+            <button className="button button-primary glass-button" type="submit" disabled={submitting}>{submitting ? 'Signing in...' : 'Sign in'} {!submitting && <span aria-hidden="true">↗</span>}</button>
           </form>
         </section>
       </main>
@@ -55,7 +61,7 @@ function Login({ onLogin, error }) {
   )
 }
 
-function ProductForm({ product, editing, onChange, onSubmit, onCancel, error }) {
+function ProductForm({ product, editing, onChange, onSubmit, onCancel, error, submitting }) {
   return (
     <form className="glass-card product-form" onSubmit={onSubmit}>
       <div className="form-heading">
@@ -72,12 +78,12 @@ function ProductForm({ product, editing, onChange, onSubmit, onCancel, error }) 
         <label>Quantity<input name="quantity" type="number" min="0" step="1" value={product.quantity} onChange={onChange} placeholder="0" required /></label>
       </div>
       {error && <p className="alert error">{error}</p>}
-      <button className="button button-primary glass-button" type="submit">{editing ? 'Save changes' : 'Add product'} <span aria-hidden="true">↗</span></button>
+      <button className="button button-primary glass-button" type="submit" disabled={submitting}>{submitting ? 'Saving...' : editing ? 'Save changes' : 'Add product'} {!submitting && <span aria-hidden="true">↗</span>}</button>
     </form>
   )
 }
 
-function ProductCard({ product, onEdit, onDelete }) {
+function ProductCard({ product, onEdit, onDelete, deleting }) {
   const availability = Number(product.quantity) === 0 ? 'Out of stock' : Number(product.quantity) <= 5 ? 'Low stock' : 'In stock'
   const availabilityClass = availability.toLowerCase().replace(' ', '-')
 
@@ -93,8 +99,8 @@ function ProductCard({ product, onEdit, onDelete }) {
         <div className="card-bottom">
           <div><p className="price">₱{Number(product.price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p><span className="muted">Product #{product.id}</span></div>
           <div className="button-row">
-            <button className="button button-ghost" onClick={() => onEdit(product)}>Edit</button>
-            <button className="button button-danger" onClick={() => onDelete(product.id)}>Delete</button>
+            <button className="button button-ghost" onClick={() => onEdit(product)} disabled={deleting}>Edit</button>
+            <button className="button button-danger" onClick={() => onDelete(product.id)} disabled={deleting}>{deleting ? 'Deleting...' : 'Delete'}</button>
           </div>
         </div>
       </div>
@@ -102,7 +108,7 @@ function ProductCard({ product, onEdit, onDelete }) {
   )
 }
 
-function ProductList({ products, onEdit, onDelete, onAdd, error }) {
+function ProductList({ products, onEdit, onDelete, onAdd, error, deleting }) {
   return (
     <>
       <section className="hero">
@@ -132,7 +138,7 @@ function ProductList({ products, onEdit, onDelete, onAdd, error }) {
         <div className="section-title"><div><p className="eyebrow">YOUR CURRENT CATALOG</p><h2>Products</h2></div><span className="muted">{products.length} item{products.length === 1 ? '' : 's'}</span></div>
         {error && <p className="alert error">{error}</p>}
         <div className="catalog-grid">
-          {products.map((product) => <ProductCard key={product.id} product={product} onEdit={onEdit} onDelete={onDelete} />)}
+          {products.map((product) => <ProductCard key={product.id} product={product} onEdit={onEdit} onDelete={onDelete} deleting={deleting} />)}
         </div>
         {!products.length && <div className="empty-state glass-card"><span className="empty-symbol">✳</span><h3>Your product list is ready.</h3><p className="muted">Add a product to start building your inventory.</p><button className="button button-primary" onClick={onAdd}>Add first product</button></div>}
       </section>
@@ -146,6 +152,9 @@ function Products({ onLogout }) {
   const [form, setForm] = useState(emptyProduct)
   const [error, setError] = useState('')
   const [authorized, setAuthorized] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   async function load() {
     try {
@@ -192,6 +201,7 @@ function Products({ onLogout }) {
 
   async function save(event) {
     event.preventDefault()
+    setSaving(true)
     try {
       const editId = route.match(/^#\/products\/edit\/(\d+)$/)?.[1]
       if (editId) await updateProduct(editId, form)
@@ -202,23 +212,30 @@ function Products({ onLogout }) {
       go('#/products')
     } catch (err) {
       setError(err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
   async function remove(id) {
     if (!window.confirm('Delete this product?')) return
+    setDeleting(true)
     try {
       await deleteProduct(id)
       await load()
     } catch (err) {
       setError(err.message)
+    } finally {
+      setDeleting(false)
     }
   }
 
   async function signOut() {
+    setSigningOut(true)
     try { await logout() } catch { /* Credentials are removed regardless. */ }
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    window.location.hash = '#/login'
     onLogout()
   }
 
@@ -243,14 +260,14 @@ function Products({ onLogout }) {
           <nav className="site-nav" aria-label="Product management navigation">
             <a className="active" href="#/products">Catalog</a>
             <a href="#/products/new">Add product</a>
-            <button className="button button-ghost" onClick={signOut}>Logout</button>
+            <button className="button button-ghost" onClick={signOut} disabled={signingOut}>{signingOut ? 'Signing out...' : 'Logout'}</button>
           </nav>
         </div>
       </header>
       <main id="catalog">
         {route === '#/products/new' || editingProduct
-          ? <section className="container standalone-section"><div className="page-heading"><p className="eyebrow">{editingProduct ? 'EDIT PRODUCT' : 'ADD PRODUCT'}</p><h1>{editingProduct ? 'Update product details.' : 'Add a new product.'}</h1><p className="lead">Keep your inventory information accurate and ready for your customers.</p></div><ProductForm product={form} editing={Boolean(editingProduct)} error={error} onChange={change} onSubmit={save} onCancel={() => { setForm(emptyProduct); setError(''); go('#/products') }} /></section>
-          : <ProductList products={products} onEdit={edit} onDelete={remove} onAdd={() => { setForm(emptyProduct); setError(''); go('#/products/new') }} error={error} />}
+          ? <section className="container standalone-section"><div className="page-heading"><p className="eyebrow">{editingProduct ? 'EDIT PRODUCT' : 'ADD PRODUCT'}</p><h1>{editingProduct ? 'Update product details.' : 'Add a new product.'}</h1><p className="lead">Keep your inventory information accurate and ready for your customers.</p></div><ProductForm product={form} editing={Boolean(editingProduct)} error={error} onChange={change} onSubmit={save} onCancel={() => { setForm(emptyProduct); setError(''); go('#/products') }} submitting={saving} /></section>
+          : <ProductList products={products} onEdit={edit} onDelete={remove} onAdd={() => { setForm(emptyProduct); setError(''); go('#/products/new') }} error={error} deleting={deleting} />}
       </main>
       <footer className="site-footer"><div className="container"><Brand /><p>Product management workspace.</p></div></footer>
     </div>
@@ -260,6 +277,12 @@ function Products({ onLogout }) {
 export default function App() {
   const [authenticated, setAuthenticated] = useState(Boolean(localStorage.getItem('access_token')))
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!authenticated && window.location.hash !== '#/login') {
+      window.location.hash = '#/login'
+    }
+  }, [authenticated])
 
   async function signIn(username, password) {
     try {
